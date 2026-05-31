@@ -1,0 +1,3 @@
+[submodule "deepfilternet-src"]
+	path = deepfilternet-src
+	url = https://github.com/Rikorose/DeepFilterNet.git

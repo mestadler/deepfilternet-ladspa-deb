@@ -1,0 +1,16 @@
+# Build artifacts
+output/*.deb
+logs/
+
+# Rust build output (upstream + root-level builds)
+target/
+deepfilternet-src/target/
+
+# Editor
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
