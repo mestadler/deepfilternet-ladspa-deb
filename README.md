@@ -244,10 +244,11 @@ DeepFilterNet works well in combination with:
 | Path | Purpose |
 |---|---|
 | `scripts/build-deb.sh` | Build script — compiles the Rust crate and packages the .deb |
+| `.github/workflows/build.yml` | CI: automated .deb build on push, weekly schedule, and tag releases |
 | `deepfilternet-src/` | Upstream DeepFilterNet source (git submodule, pinned at v0.5.6-89) |
 | `output/` | Built `.deb` artifacts (gitignored) |
 | `logs/` | Build logs (gitignored) |
-| `TODO.md` | Planned improvements (CI auto-rebuild) |
+| `TODO.md` | Planned improvements |
 
 ## License
 
