@@ -32,11 +32,11 @@ Build system and guide for packaging [DeepFilterNet](https://github.com/Rikorose
 
 ## Introduction
 
-Easy Effects (formerly PulseEffects) is a powerful audio processing system for Linux that provides studio-quality effects from your desktop. While most distributions include a comprehensive suite of effects, one crucial component is often missing: the neural network-based noise reduction plugin from DeepFilterNet.
+If you use your microphone on Linux — for video calls, podcasts, voice chat, or recordings — you've probably noticed background noise: keyboard clatter, fan hum, room echo, or people talking nearby. Traditional noise gates only cut audio below a volume threshold, and spectral subtraction struggles with complex, varying noise. The result is either still-noisy audio or that telltale robotic underwater sound.
 
-DeepFilterNet is a state-of-the-art speech enhancement framework that uses deep learning to remove background noise from audio in real-time. Unlike traditional noise gates or spectral subtraction, DeepFilterNet leverages neural networks trained on thousands of hours of audio to distinguish between speech and background noise with remarkable accuracy — making it particularly effective for removing complex, dynamic sounds like keyboard typing, fan noise, or ambient chatter while preserving natural speech clarity.
+DeepFilterNet takes a different approach. It uses a neural network trained on thousands of hours of audio to distinguish speech from background noise in real-time — removing keyboard typing, fan noise, and ambient chatter while preserving natural speech clarity. Integrated into Easy Effects via its LADSPA plugin, it gives you studio-grade noise reduction with a GUI slider, no command-line wrangling during a call.
 
-Many Linux distributions, including Debian Sid, don't package the DeepFilterNet LADSPA plugin alongside Easy Effects due to licensing restrictions, file size considerations, or packaging oversights. This guide walks through manually installing the plugin to enable professional-grade noise reduction for podcasts, voice calls, recordings, and any application where clean speech matters.
+**The problem**: Debian (and most other distributions) don't ship the DeepFilterNet LADSPA plugin with Easy Effects. The plugin lives in the DeepFilterNet source tree but isn't packaged separately — leaving a gap between installing Easy Effects and actually getting best-in-class noise reduction. This project closes that gap by building the plugin from source and packaging it as a `.deb` you can install in one command.
 
 ## Understanding the Components
 
