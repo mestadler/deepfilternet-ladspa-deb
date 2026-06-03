@@ -1,33 +1,6 @@
 # DeepFilterNet LADSPA Plugin — Debian Packaging
 
 Build system and guide for packaging [DeepFilterNet](https://github.com/Rikorose/DeepFilterNet)'s LADSPA noise-reduction plugin as a Debian `.deb` package, enabling neural-network voice denoising in **Easy Effects** on Debian Sid / Debian 13.
-
-> **Attribution**: This guide is a Debian adaptation of [Adam Gradzki's original solution for Arch Linux](https://adamgradzki.com/adding-deepfilternet-noise-reduction-to-easy-effects-on-arch-linux.html) (published November 2025).
-> His work established the approach for integrating DeepFilterNet with Easy Effects; this project adapts it for Debian's package format and tooling.
-
----
-
-## Table of Contents
-
-- [Introduction](#introduction)
-- [Understanding the Components](#understanding-the-components)
-- [Prerequisites](#prerequisites)
-- [Installation](#installation)
-  - [Step 1: Identify Your System Architecture](#step-1-identify-your-system-architecture)
-  - [Step 2: Obtain the DeepFilterNet .deb Package](#step-2-obtain-the-deepfilternet-deb-package)
-  - [Step 3: Install the .deb Package](#step-3-install-the-deb-package)
-  - [Step 4: Verify the Plugin Works](#step-4-verify-the-plugin-works)
-  - [Step 5: Configure Easy Effects](#step-5-configure-easy-effects)
-- [Important Configuration](#important-configuration)
-  - [Launch Easy Effects on Startup](#launch-easy-effects-on-startup)
-  - [Route Audio Through Easy Effects](#route-audio-through-easy-effects)
-- [Troubleshooting](#troubleshooting)
-- [Advanced Configuration](#advanced-configuration)
-- [Performance Considerations](#performance-considerations)
-- [Alternative Solutions](#alternative-solutions)
-- [Project Files](#project-files)
-- [License](#license)
-
 ---
 
 ## Introduction
@@ -130,44 +103,11 @@ This should list `/usr/lib/ladspa/libdeep_filter_ladspa.so`.
    - Adjust settings in real-time to find the optimal balance
    - Use the bypass toggle to compare processed and unprocessed audio
 
-## Important Configuration
-
-### Launch Easy Effects on Startup
-
-Easy Effects must be running to process audio through DeepFilterNet. Configure it to launch automatically:
-
-**Option 1: Built-in setting (recommended)**
-
-1. Open Easy Effects
-2. Click the menu button (☰) → **Preferences**
-3. In the **General** tab, enable **"Launch Easy Effects at startup"** / **"Start on login"**
-
-**Option 2: System-level autostart**
-
-For GNOME:
-
-```bash
-cp /usr/share/applications/com.github.wwmm.easyeffects.desktop ~/.config/autostart/
-```
-
-For KDE Plasma: **System Settings** → **Startup and Shutdown** → **Autostart** → **Add Application** → Easy Effects.
+## Configuration
 
 ### Route Audio Through Easy Effects
 
-> **Critical**: Applications must use the **"Easy Effects Source"** virtual input device, not your physical microphone directly.
-
-When Easy Effects is running, it creates a virtual input source that captures your raw microphone input, processes it through DeepFilterNet and any other configured effects, then outputs the filtered audio.
-
-**Per-application configuration:**
-
-| Application | Setting |
-|---|---|
-| **Zoom** | Settings → Audio → Microphone: "Easy Effects Source" |
-| **Discord** | Voice & Video → Input Device: "Easy Effects Source" |
-| **Teams / Google Meet** | Application settings → Input: "Easy Effects Source" |
-| **Audacity** | Recording Preferences → Input: "Easy Effects Source" |
-
-**System-wide**: In your desktop's sound settings, set the default input device to "Easy Effects Source" so all applications automatically use the filtered audio.
+When Easy Effects is running, it creates a virtual input source that captures your raw microphone input, processes it through DeepFilterNet and any other configured effects, then outputs the filtered audio. In your desktop's sound settings, set the default input device to "Easy Effects Source" so all applications automatically use the filtered audio.  If you prefer you can select the source only for the application through the application itself by selecting the microphone to 'easy effects source'
 
 **Verify it's working:**
 
@@ -177,7 +117,50 @@ When Easy Effects is running, it creates a virtual input source that captures yo
 4. Configure your application to use "Easy Effects Source"
 5. Test by recording audio or joining a call
 
-> ⚠️ If applications use your standard microphone input instead of "Easy Effects Source," all audio processing is bypassed — DeepFilterNet noise reduction will not be applied.
+# What the Controls Actually Do
+
+DeepFilterNet processes audio in two stages: a coarse **ERB stage** that corrects the overall speech envelope, and a fine **DF (Deep Filtering) stage** that restores speech periodicity at low frequencies. The controls expose the thresholds that govern when each stage runs.
+
+The model continuously estimates the local **signal-to-noise ratio (SNR)** on each 10ms frame. That SNR estimate drives all the threshold decisions below.
+
+---
+
+**Attenuation Limit (dB)** — range 0–100, default 100
+
+A hard cap on how much the plugin is allowed to suppress noise. At 100 (maximum), the model applies its full estimated suppression. Lowering it — say to 6 dB — lets some background noise through intentionally, which can sound more natural and less like you're in a dead room. Useful if full suppression makes your voice sound hollow.
+
+---
+
+**Minimum Processing Threshold (dB)** — range -15 to 35, default -15
+
+The SNR floor below which the plugin gives up entirely and outputs silence for that frame. If the estimated SNR drops below this value, both decoders are disabled and a silent spectrum is returned — the input is considered too noisy to be worth processing. Raising it (e.g. to -7 dB as in your screenshot) makes the plugin cut out sooner in very noisy conditions, which can reduce artefacts at the cost of occasionally clipping very quiet speech.
+
+---
+
+**Maximum ERB Processing Threshold (dB)** — range -15 to 35, default 35
+
+The SNR ceiling above which the ERB (coarse envelope) decoder is disabled. Above this threshold the signal is already clean enough that correcting the envelope isn't necessary. Your value of 30 dB means the ERB stage is skipped once the signal is clearly clean — saves a little CPU and avoids unnecessary processing of already-good audio.
+
+---
+
+**Maximum DF Processing Threshold (dB)** — range -15 to 35, default 35
+
+The SNR ceiling above which the DF (deep filtering, fine periodicity) decoder is disabled. The paper explicitly states that above 20 dB, the DF decoder is disabled since only low-noise conditions exist and enhancing periodicity is not necessary. Your setting of 20 dB matches exactly what the authors recommend. The DF stage is the more expensive of the two, so skipping it when SNR is high is the right trade-off.
+
+---
+
+**Minimum Processing Buffer (frames)** — range 0–10, default 0
+
+How many frames of audio the plugin accumulates before starting to output processed audio. Zero means lowest possible latency (~20ms, one STFT window). Increasing it adds latency but can improve quality on hardware that struggles to keep up in real-time, by giving the model a small lookahead buffer. Leave at 0 for voice calls; you'd only raise it for recording where latency doesn't matter.
+
+---
+
+**Post Filter Beta** — range 0–0.05, default 0
+
+Controls a post-processing step that applies a small amount of extra over-attenuation to residual noise. A value of 0 disables it. Small values (your 0.02) slightly increase aggressiveness on noise that slipped through the main model, at the risk of very faintly affecting speech quality. Think of it as a gentle "mop up" pass. The upstream `--pf` CLI flag enables this with a baked-in value; here you control the strength directly.
+
+---
+
 
 ## Troubleshooting
 
@@ -236,7 +219,6 @@ DeepFilterNet works well in combination with:
 |---|---|---|
 | **Traditional Noise Gates** | Simple, low resource usage | Less effective for complex noise |
 | **Spectral Subtraction** | Good for constant background noise | Can create artifacts |
-| **Commercial Solutions** | Advanced noise reduction capabilities | Proprietary, often costly |
 | **RNNoise** (LADSPA) | Another neural option, lighter | Less accurate than DeepFilterNet |
 
 ## Project Files
@@ -249,6 +231,11 @@ DeepFilterNet works well in combination with:
 | `output/` | Built `.deb` artifacts (gitignored) |
 | `logs/` | Build logs (gitignored) |
 | `TODO.md` | Planned improvements |
+
+
+
+> **Attribution**: This guide started as a Debian adaptation of [Adam Gradzki's original solution for Arch Linux](https://adamgradzki.com/adding-deepfilternet-noise-reduction-to-easy-effects-on-arch-linux.html) (published November 2025).
+> His work established the approach for integrating DeepFilterNet with Easy Effects; this project adapts it for Debian's package format and tooling.
 
 ## License
 
